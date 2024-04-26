@@ -90,14 +90,19 @@ def get_rays_batch(directions, c2w):
 
 
 class ScanNetDataset(Dataset):
-    def __init__(self, root_dir, split='train', downsample=1.0, sampling_strategy='all_images'):
+    def __init__(self, root_dir, split='train', downsample=1.0, is_stack=False, sampling_strategy='all_images', n_views=100):
         super().__init__()
+
 
         self.root_dir = root_dir
         self.split = split
         self.downsample = downsample
+        self.is_stack = is_stack
 
         self.unpad = 24
+        self.white_bg = False
+        self.near_far = [0.05, 1.0]
+        self.scene_bbox = torch.tensor([[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]])
 
         self.read_intrinsics()
         self.read_meta(split)
@@ -116,17 +121,17 @@ class ScanNetDataset(Dataset):
         self.img_wh = (W, H)
 
     def read_meta(self, split):
-        self.rgbs = []
+        self.all_rgbs = []
         self.poses = []
 
         if split == 'train':
             with open(os.path.join(self.root_dir, "train.txt"), 'r') as f:
                 frames = f.read().strip().split()
-                frames = frames[:80]
+                #frames = frames
         else:
             with open(os.path.join(self.root_dir, f"{split}.txt"), 'r') as f:
                 frames = f.read().strip().split()
-                frames = frames[:80]
+                #frames = frames
 
         cam_bbox = np.loadtxt(os.path.join(self.root_dir, f"cam_bbox.txt"))
         sbbox_scale = (cam_bbox[1] - cam_bbox[0]).max() + 2 * SCANNET_FAR
@@ -147,16 +152,21 @@ class ScanNetDataset(Dataset):
             try:
                 img_path = os.path.join(self.root_dir, f"color/{frame}.jpg")
                 img = read_image(img_path, self.img_wh, unpad=self.unpad)
-                self.rgbs += [img]
+                self.all_rgbs += [img]
             except: pass
 
-        self.rgbs = torch.FloatTensor(np.stack(self.rgbs))  # (N_images, hw, ?)
+        self.all_rgbs = torch.FloatTensor(np.stack(self.all_rgbs))  # (N_images, hw, ?)
         self.poses = torch.FloatTensor(self.poses)  # (N_images, 3, 4)
 
         rays_o, rays_d = get_rays_batch(self.directions, self.poses)
-        self.rays = torch.cat([rays_o, rays_d], dim=-1)
+        self.all_rays = torch.cat([rays_o, rays_d], dim=-1)
+
+        if not self.is_stack:
+            self.all_rays = self.all_rays.view(-1, 6)
+            self.all_rgbs = self.all_rgbs.view(-1, 3)
+
 
     def __getitem__(self, idx):
-        sample = {'rays': self.rays[idx],
-                  'rgbs': self.rgbs[idx]}
+        sample = {'rays': self.all_rays[idx],
+                  'rgbs': self.all_rgbs[idx]}
         return sample

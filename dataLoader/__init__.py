@@ -6,6 +6,7 @@ from .tankstemple import TanksTempleDataset
 from .your_own_data import YourOwnDataset
 from .unbounded import UnboundedDataset
 from .dtu import DtuDataset
+from .scannet import ScanNetDataset
 
 dataset_dict = {'blender': BlenderDataset,
                'llff':LLFFDataset,
@@ -14,4 +15,5 @@ dataset_dict = {'blender': BlenderDataset,
                 'own_data':YourOwnDataset,
                 'unbounded':UnboundedDataset,
                 'realdata': RealdataDataset,
-                'dtu': DtuDataset,}
+                'dtu': DtuDataset,
+                'scannet': ScanNetDataset}
